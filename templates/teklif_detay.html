@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Teklif Detayı</title>
+</head>
+<body>
+    <h1>Teklif #{{ teklif.id }} Detayı</h1>
+    <a href="{{ url_for('teklifler') }}">← Tüm Teklifler</a><br><br>
+
+    <h2>Müşteri Bilgisi</h2>
+    <p><strong>{{ teklif.firma_adi }}</strong> ({{ teklif.ad }} {{ teklif.soyad }})<br>
+    Vergi No: {{ teklif.vergi_no }}</p>
+
+    <h2>Teklif Bilgileri</h2>
+    <p>Tarih: {{ teklif.tarih }}<br>
+    Gün Sayısı: {{ teklif.gun_sayisi }}<br>
+    Kar Oranı: {{ teklif.kar_orani * 100 }}%<br>
+    Toplam Tutar: {{ "%.2f"|format(teklif.toplam_fiyat) }} ₺</p>
+
+    <h2>Personeller</h2>
+    <ul>
+        {% for p in personeller %}
+            <li>{{ p.ad }} - {{ p.pozisyon }} ({{ "%.2f"|format(p.gunluk_maas) }} ₺ / gün)</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Ürünler</h2>
+    <ul>
+        {% for u in urunler %}
+            <li>{{ u.ad }} - {{ u.miktar }} adet × {{ "%.2f"|format(u.birim_fiyat) }} ₺ + %{{ u.kdv_orani * 100 }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

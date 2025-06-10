@@ -1,0 +1,25 @@
+<form method="POST">
+    <label>Müşteri Seç:</label><br>
+    <select name="musteri_id" required>
+        {% for m in musteriler %}
+            <option value="{{ m.id }}">{{ m.firma_adi or m.ad }} - {{ m.vergi_no }}</option>
+        {% endfor %}
+    </select><br><br>
+
+    <label>Kar Oranı (örn: 0.20):</label><br>
+    <input type="number" name="kar_orani" step="0.01" value="0.20" required><br><br>
+
+    <h3>Personel Seçimi ve Gün Sayısı</h3>
+    {% for p in personeller %}
+        <input type="checkbox" name="personel_id" value="{{ p.id }}"> {{ p.ad }} ({{ p.pozisyon }}) <br>
+        Gün Sayısı: <input type="number" name="gun_{{ p.id }}" min="1" value="1"><br><br>
+    {% endfor %}
+
+    <h3>Ürün Seçimi ve Adet</h3>
+    {% for u in urunler %}
+        <input type="checkbox" name="urun_id" value="{{ u.id }}"> {{ u.ad }}<br>
+        Adet: <input type="number" name="urun_adet_{{ u.id }}" min="1" value="1"><br><br>
+    {% endfor %}
+
+    <button type="submit">Teklifi Oluştur</button>
+</form>

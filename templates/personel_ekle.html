@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Personel Ekle</title>
+</head>
+<body>
+    <h1>Yeni Personel Ekle</h1>
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('index') }}">Ana Sayfa</a></li>
+            <li><a href="{{ url_for('personel_ekle') }}">Personel Ekle</a></li>
+        </ul>
+    </nav>
+
+    <form method="POST">
+        <label>Ad Soyad:</label><br>
+        <input type="text" name="ad" required><br><br>
+
+        <label>Pozisyon:</label><br>
+        <input type="text" name="pozisyon"><br><br>
+
+        <label>Telefon:</label><br>
+        <input type="text" name="telefon"><br><br>
+
+        <label>E-posta:</label><br>
+        <input type="email" name="eposta"><br><br>
+
+        <label>Adres:</label><br>
+        <textarea name="adres" rows="3" cols="30"></textarea><br><br>
+
+        <label>Günlük Maaş (₺):</label><br>
+        <input type="number" name="gunluk_maas" step="0.01" required><br><br>
+
+        <button type="submit">Ekle</button>
+    </form>
+</body>
+</html>

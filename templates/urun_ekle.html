@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ürün Ekle</title>
+</head>
+<body>
+    <h1>Yeni Ürün Ekle</h1>
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('index') }}">Ana Sayfa</a></li>
+            <li><a href="{{ url_for('personel_ekle') }}">Personel Ekle</a></li>
+            <li><a href="{{ url_for('urun_ekle') }}">Ürün Ekle</a></li>
+        </ul>
+    </nav>
+    
+    <form method="POST">
+        <label>Ürün Adı:</label><br>
+        <input type="text" name="ad" required><br><br>
+        
+        <label>Adet:</label><br>
+        <input type="number" name="adet" min="1" value="1"><br><br>
+        
+        <label>Renk:</label><br>
+        <input type="text" name="renk"><br><br>
+        
+        <label>Boyut (cm):</label><br>
+        <input type="text" name="boyut_cm"><br><br>
+        
+        <label>Birim Fiyat (₺):</label><br>
+        <input type="number" name="birim_fiyat" step="0.01" required><br><br>
+        
+        <label>KDV Oranı (% olarak - örnek: 20 yazmak için 20 girin):</label><br>
+        <input type="number" name="kdv_orani" step="0.01" value="20" placeholder="20"><br><br>
+        
+        <button type="submit">Ürünü Kaydet</button>
+    </form>
+    
+    <script>
+    // Form gönderilmeden önce KDV'yi 100'e böl
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const kdvInput = document.querySelector('input[name="kdv_orani"]');
+        const kdvValue = parseFloat(kdvInput.value);
+        
+        // Eğer 1'den büyükse (yüzde olarak girilmişse), 100'e böl
+        if (kdvValue > 1) {
+            kdvInput.value = (kdvValue / 100).toFixed(3);
+        }
+    });
+    </script>
+</body>
+</html>

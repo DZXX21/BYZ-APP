@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>İş Takip Sistemi</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .btn { padding: 8px 15px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f8f9fa; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; }
+        .nav { background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; }
+        .nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .checkbox-list { max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 3px; }
+        .checkbox-item { margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="{{ url_for('index') }}">Ana Sayfa</a>
+            <a href="{{ url_for('is_takip') }}">İş Takip</a>
+            <a href="{{ url_for('personel_rapor') }}">Personel Raporu</a>
+            <a href="{{ url_for('personel_ekle') }}">Personel Ekle</a>
+        </div>
+
+        <h1>İş Takip Sistemi - {{ bugun }}</h1>
+
+        <!-- Personel Kayıt -->
+        <div class="section">
+            <h2>Personel İş Kayıtları</h2>
+            
+            <div class="form-grid">
+                <!-- Tekil Kayıt -->
+                <div>
+                    <h3>Tekil Personel Kaydı</h3>
+                    <form method="POST" action="{{ url_for('personel_giris') }}">
+                        <div class="form-group">
+                            <label>Personel:</label>
+                            <select name="personel_id" required>
+                                <option value="">Personel Seçin</option>
+                                {% for p in personeller %}
+                                <option value="{{ p.id }}">{{ p.ad }} ({{ p.pozisyon }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tarih (boş bırakırsa bugün):</label>
+                            <input type="date" name="tarih" placeholder="YYYY-MM-DD">
+                        </div>
+                        <div class="form-group">
+                            <label>Açıklama:</label>
+                            <input type="text" name="aciklama" placeholder="Örn: Normal mesai, fazla mesai...">
+                        </div>
+                        <button type="submit" class="btn btn-success">Kaydet</button>
+                    </form>
+                </div>
+
+                <!-- Toplu Kayıt -->
+                <div>
+                    <h3>Toplu Personel Kaydı</h3>
+                    <form method="POST" action="{{ url_for('toplu_giris') }}">
+                        <div class="form-group">
+                            <label>Tarih:</label>
+                            <input type="date" name="tarih" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Personeller:</label>
+                            <div class="checkbox-list">
+                                {% for p in personeller %}
+                                <div class="checkbox-item">
+                                    <input type="checkbox" name="personel_ids" value="{{ p.id }}" id="p{{ p.id }}">
+                                    <label for="p{{ p.id }}" style="display: inline; margin-left: 5px;">{{ p.ad }} ({{ p.pozisyon }})</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Açıklama:</label>
+                            <input type="text" name="aciklama" value="Toplu kayıt">
+                        </div>
+                        <button type="submit" class="btn btn-warning">Toplu Kaydet</button>
+                        <button type="button" class="btn btn-primary" onclick="selectAll()">Tümünü Seç</button>
+                        <button type="button" class="btn btn-primary" onclick="selectNone()">Hiçbirini Seçme</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bugünün Kayıtları -->
+        <div class="section">
+            <h2>Bugünün Kayıtları</h2>
+            {% if bugun_kayitlari %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Personel</th>
+                        <th>Pozisyon</th>
+                        <th>Tarih</th>
+                        <th>Saat</th>
+                        <th>Açıklama</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for kayit in bugun_kayitlari %}
+                    <tr>
+                        <td>{{ kayit.ad }}</td>
+                        <td>{{ kayit.pozisyon }}</td>
+                        <td>{{ kayit.tarih.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ kayit.tarih.strftime('%H:%M') }}</td>
+                        <td>{{ kayit.aciklama or '-' }}</td>
+                        <td>
+                            <a href="{{ url_for('kayit_sil', kayit_id=kayit.id) }}" 
+                               class="btn btn-danger" 
+                               onclick="return confirm('Bu kaydı silmek istediğinizden emin misiniz?')">Sil</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Bugün henüz kayıt yok.</p>
+            {% endif %}
+        </div>
+
+        <!-- Hızlı Linkler -->
+        <div class="section">
+            <h2>Hızlı Erişim</h2>
+            <a href="{{ url_for('personel_rapor') }}" class="btn btn-primary">Bu Ay Raporu</a>
+            <a href="{{ url_for('personel_rapor', ay=bugun.month-1 if bugun.month > 1 else 12, yil=bugun.year if bugun.month > 1 else bugun.year-1) }}" class="btn btn-primary">Geçen Ay Raporu</a>
+        </div>
+    </div>
+
+    <script>
+        function selectAll() {
+            const checkboxes = document.querySelectorAll('input[name="personel_ids"]');
+            checkboxes.forEach(cb => cb.checked = true);
+        }
+
+        function selectNone() {
+            const checkboxes = document.querySelectorAll('input[name="personel_ids"]');
+            checkboxes.forEach(cb => cb.checked = false);
+        }
+    </script>
+</body>
+</html>

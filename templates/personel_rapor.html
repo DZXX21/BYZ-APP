@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Personel Maaş Raporu</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .btn { padding: 8px 15px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f8f9fa; }
+        .toplam { background-color: #e9ecef; font-weight: bold; }
+        .nav { background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; }
+        .nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+        .form-group { margin-bottom: 15px; display: inline-block; margin-right: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select { padding: 8px; border: 1px solid #ddd; border-radius: 3px; }
+        .money-positive { color: #28a745; font-weight: bold; }
+        .money-negative { color: #dc3545; font-weight: bold; }
+        .money-neutral { color: #6c757d; }
+        .filter-section { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; align-items: end; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="{{ url_for('index') }}">Ana Sayfa</a>
+            <a href="{{ url_for('is_takip') }}">İş Takip</a>
+            <a href="{{ url_for('nakit_avans') }}">Nakit Avans</a>
+            <a href="{{ url_for('personel_rapor') }}">Personel Raporu</a>
+            <a href="{{ url_for('personel_ekle') }}">Personel Ekle</a>
+        </div>
+
+        <h1>💰 Personel Maaş Raporu - {{ ay_adi }} {{ yil }}</h1>
+
+        <!-- Filtreler -->
+        <div class="filter-section">
+            <h3>📊 Rapor Filtreleri</h3>
+            <form method="GET">
+                <div class="filter-grid">
+                    <div class="form-group">
+                        <label>Personel:</label>
+                        <select name="personel_id" onchange="this.form.submit()">
+                            <option value="">Tüm Personel</option>
+                            {% for p in tum_personeller %}
+                            <option value="{{ p.id }}" {% if request.args.get('personel_id') == p.id|string %}selected{% endif %}>
+                                {{ p.ad }} ({{ p.pozisyon }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Ay:</label>
+                        <select name="ay" onchange="this.form.submit()">
+                            {% for i in range(1, 13) %}
+                            <option value="{{ i }}" {% if i == ay %}selected{% endif %}>
+                                {{ ['','Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'][i] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Yıl:</label>
+                        <select name="yil" onchange="this.form.submit()">
+                            {% for i in range(2020, 2030) %}
+                            <option value="{{ i }}" {% if i == yil %}selected{% endif %}>{{ i }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn btn-primary">🔍 Filtrele</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Personel Raporu -->
+        <div class="section">
+            <h2>Maaş Hesabı (Avans Dahil)</h2>
+            
+            {% if request.args.get('personel_id') %}
+            <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                <strong>🔍 Filtre aktif:</strong> 
+                {% for p in tum_personeller %}
+                    {% if p.id|string == request.args.get('personel_id') %}
+                        {{ p.ad }} ({{ p.pozisyon }}) personeli gösteriliyor
+                    {% endif %}
+                {% endfor %}
+                - <a href="{{ url_for('personel_rapor', ay=ay, yil=yil) }}">Tüm personeli göster</a>
+            </div>
+            {% endif %}
+            
+            {% if personel_raporu %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Personel Adı</th>
+                        <th>Pozisyon</th>
+                        <th>Çalışma Günü</th>
+                        <th>Günlük Maaş</th>
+                        <th>Brüt Maaş</th>
+                        <th>Avans (-)</th>
+                        <th>Net Maaş</th>
+                        <th>Detay</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set toplam_brut = 0 %}
+                    {% set toplam_avans = 0 %}
+                    {% set toplam_net = 0 %}
+                    {% for item in personel_raporu %}
+                    <tr>
+                        <td>{{ item.personel.ad }}</td>
+                        <td>{{ item.personel.pozisyon }}</td>
+                        <td>{{ item.calisma_gunu }} gün</td>
+                        <td>{{ "{:,.2f}".format(item.gunluk_maas) }} TL</td>
+                        <td class="money-positive">{{ "{:,.2f}".format(item.brut_maas) }} TL</td>
+                        <td class="money-negative">{{ "{:,.2f}".format(item.toplam_avans) }} TL</td>
+                        <td class="{% if item.net_maas > 0 %}money-positive{% elif item.net_maas < 0 %}money-negative{% else %}money-neutral{% endif %}">
+                            {{ "{:,.2f}".format(item.net_maas) }} TL
+                        </td>
+                        <td>
+                            <a href="{{ url_for('personel_detay', personel_id=item.personel.id, ay=ay, yil=yil) }}" class="btn btn-primary">Detay</a>
+                        </td>
+                    </tr>
+                    {% set toplam_brut = toplam_brut + item.brut_maas %}
+                    {% set toplam_avans = toplam_avans + item.toplam_avans %}
+                    {% set toplam_net = toplam_net + item.net_maas %}
+                    {% endfor %}
+                    <tr class="toplam">
+                        <td colspan="4">GENEL TOPLAM</td>
+                        <td class="money-positive">{{ "{:,.2f}".format(toplam_brut) }} TL</td>
+                        <td class="money-negative">{{ "{:,.2f}".format(toplam_avans) }} TL</td>
+                        <td class="{% if toplam_net > 0 %}money-positive{% elif toplam_net < 0 %}money-negative{% else %}money-neutral{% endif %}">
+                            {{ "{:,.2f}".format(toplam_net) }} TL
+                        </td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+            {% else %}
+            <div style="background: #f8f9fa; padding: 20px; text-align: center; border-radius: 5px;">
+                <p>Bu kriterlere uygun personel kaydı bulunamadı.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Özet Bilgiler -->
+        <div class="section">
+            <h2>Özet</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center;">
+                    <h3>{{ "Seçili" if request.args.get('personel_id') else "Toplam" }} Personel</h3>
+                    <p style="font-size: 24px; font-weight: bold;">{{ personel_raporu|length }}</p>
+                </div>
+                <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; text-align: center;">
+                    <h3>Çalışan Personel</h3>
+                    <p style="font-size: 24px; font-weight: bold;">{{ personel_raporu|selectattr('calisma_gunu', 'gt', 0)|list|length }}</p>
+                </div>
+                <div style="background: #fff3e0; padding: 15px; border-radius: 5px; text-align: center;">
+                    <h3>Brüt Maaş Toplamı</h3>
+                    <p style="font-size: 20px; font-weight: bold; color: #28a745;">{{ "{:,.0f}".format(personel_raporu|sum(attribute='brut_maas')) }} TL</p>
+                </div>
+                <div style="background: #ffebee; padding: 15px; border-radius: 5px; text-align: center;">
+                    <h3>Toplam Avans</h3>
+                    <p style="font-size: 20px; font-weight: bold; color: #dc3545;">{{ "{:,.0f}".format(personel_raporu|sum(attribute='toplam_avans')) }} TL</p>
+                </div>
+                <div style="background: #f3e5f5; padding: 15px; border-radius: 5px; text-align: center;">
+                    <h3>Net Ödeme</h3>
+                    <p style="font-size: 20px; font-weight: bold; color: #6a1b9a;">{{ "{:,.0f}".format(personel_raporu|sum(attribute='net_maas')) }} TL</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Uyarılar -->
+        {% set avans_fazla = personel_raporu|selectattr('net_maas', 'lt', 0)|list %}
+        {% if avans_fazla %}
+        <div class="section" style="background: #fff3cd; border-color: #ffeaa7;">
+            <h2>⚠️ Dikkat</h2>
+            <p><strong>Aşağıdaki personellerin avansı maaşından fazla:</strong></p>
+            <ul>
+                {% for item in avans_fazla %}
+                <li>{{ item.personel.ad }} - Fazla Avans: <span class="money-negative">{{ "{:,.2f}".format(item.net_maas * -1) }} TL</span></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Hızlı Linkler -->
+        <div class="section">
+            <h2>🔗 Hızlı Linkler</h2>
+            <a href="{{ url_for('personel_rapor', ay=ay-1 if ay > 1 else 12, yil=yil if ay > 1 else yil-1) }}" class="btn btn-primary">⬅️ Önceki Ay</a>
+            <a href="{{ url_for('personel_rapor', ay=ay+1 if ay < 12 else 1, yil=yil if ay < 12 else yil+1) }}" class="btn btn-primary">➡️ Sonraki Ay</a>
+            <a href="{{ url_for('nakit_avans') }}" class="btn btn-success">💰 Avans Ver</a>
+            <a href="{{ url_for('is_takip') }}" class="btn btn-success">📝 İş Takip</a>
+        </div>
+    </div>
+</body>
+</html>

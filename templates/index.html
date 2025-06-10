@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Teklif Sistemi</title>
+</head>
+<body>
+    <h1>Teklif ve Fatura Sistemi</h1>
+    <nav>
+<ul>
+    <li><a href="{{ url_for('index') }}">Ana Sayfa</a></li>
+    <li><a href="{{ url_for('personel_ekle') }}">Personel Ekle</a></li>
+    <li><a href="{{ url_for('urun_ekle') }}">Ürün Ekle</a></li>
+    <li><a href="{{ url_for('musteri_ekle') }}">Müşteri Ekle</a></li>
+    <li><a href="{{ url_for('teklif_olustur') }}">Teklif Oluştur</a></li>
+    <li><a href="{{ url_for('teklifler') }}">Teklifler</a></li>
+    <li><a href="{{ url_for('is_takip') }}">İş Takip</a></li>
+    <li><a href="{{ url_for('nakit_avans') }}">Nakit Avans</a></li>
+    <li><a href="{{ url_for('personel_rapor') }}">Personel Raporu</a></li>
+</ul>
+
+    </nav>
+
+    <p>Hoş geldiniz! Sol üstteki menüden işlem seçin.</p>
+</body>
+</html>

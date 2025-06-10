@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Müşteri Ekle</title>
+</head>
+<body>
+    <h1>Yeni Müşteri Ekle</h1>
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('index') }}">Ana Sayfa</a></li>
+            <li><a href="{{ url_for('personel_ekle') }}">Personel Ekle</a></li>
+            <li><a href="{{ url_for('urun_ekle') }}">Ürün Ekle</a></li>
+            <li><a href="{{ url_for('musteri_ekle') }}">Müşteri Ekle</a></li>
+        </ul>
+    </nav>
+
+    <form method="POST">
+        <label>Ad:</label><br>
+        <input type="text" name="ad" required><br><br>
+
+        <label>Soyad:</label><br>
+        <input type="text" name="soyad"><br><br>
+
+        <label>Firma Adı:</label><br>
+        <input type="text" name="firma_adi"><br><br>
+
+        <label>Vergi No:</label><br>
+        <input type="text" name="vergi_no"><br><br>
+
+        <label>E-posta:</label><br>
+        <input type="email" name="email"><br><br>
+
+        <label>Telefon:</label><br>
+        <input type="text" name="telefon"><br><br>
+
+        <button type="submit">Müşteriyi Kaydet</button>
+    </form>
+</body>
+</html>

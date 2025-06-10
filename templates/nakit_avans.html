@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Nakit Avans Sistemi</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .btn { padding: 8px 15px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f8f9fa; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; }
+        .nav { background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; }
+        .nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+        .money { color: #28a745; font-weight: bold; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="{{ url_for('index') }}">Ana Sayfa</a>
+            <a href="{{ url_for('is_takip') }}">İş Takip</a>
+            <a href="{{ url_for('nakit_avans') }}">Nakit Avans</a>
+            <a href="{{ url_for('personel_rapor') }}">Personel Raporu</a>
+            <a href="{{ url_for('personel_ekle') }}">Personel Ekle</a>
+        </div>
+
+        <h1>💰 Nakit Avans Sistemi</h1>
+
+        <!-- Avans Verme -->
+        <div class="section">
+            <h2>Personele Avans Ver</h2>
+            
+            <form method="POST" action="{{ url_for('avans_ver') }}">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Personel:</label>
+                        <select name="personel_id" required>
+                            <option value="">Personel Seçin</option>
+                            {% for p in personeller %}
+                            <option value="{{ p.id }}">{{ p.ad }} ({{ p.pozisyon }}) - {{ "{:,.0f}".format(p.gunluk_maas) }} TL/gün</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Avans Miktarı (TL):</label>
+                        <input type="number" name="miktar" step="0.01" min="1" required placeholder="Örn: 500">
+                    </div>
+                </div>
+                
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Tarih (boş bırakırsa bugün):</label>
+                        <input type="date" name="tarih">
+                    </div>
+                    <div class="form-group">
+                        <label>Açıklama:</label>
+                        <input type="text" name="aciklama" placeholder="Örn: Nakit avans, acil durum...">
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-success">💰 Avans Ver</button>
+            </form>
+        </div>
+
+        <!-- Bu Ayki Avanslar -->
+        <div class="section">
+            <h2>Bu Ayki Avans Kayıtları</h2>
+            
+            {% if bu_ay_avanslar %}
+            {% set toplam_avans = bu_ay_avanslar|sum(attribute='miktar') %}
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <h3>Bu Ay Toplam Avans: <span class="money">{{ "{:,.2f}".format(toplam_avans) }} TL</span></h3>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Personel</th>
+                        <th>Pozisyon</th>
+                        <th>Miktar</th>
+                        <th>Tarih</th>
+                        <th>Açıklama</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for avans in bu_ay_avanslar %}
+                    <tr>
+                        <td>{{ avans.ad }}</td>
+                        <td>{{ avans.pozisyon }}</td>
+                        <td class="money">{{ "{:,.2f}".format(avans.miktar) }} TL</td>
+                        <td>{{ avans.tarih.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ avans.aciklama or '-' }}</td>
+                        <td>
+                            <a href="{{ url_for('avans_sil', avans_id=avans.id) }}" 
+                               class="btn btn-danger" 
+                               onclick="return confirm('Bu avans kaydını silmek istediğinizden emin misiniz?')">Sil</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="background: #f8f9fa; padding: 20px; text-align: center; border-radius: 5px;">
+                <p>Bu ay henüz avans kaydı yok.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Personel Avans Özeti -->
+        <div class="section">
+            <h2>Personel Avans Özeti (Bu Ay)</h2>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Personel</th>
+                        <th>Pozisyon</th>
+                        <th>Günlük Maaş</th>
+                        <th>Toplam Avans</th>
+                        <th>Avans Sayısı</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for personel in personeller %}
+                    {% set personel_avanslar = bu_ay_avanslar|selectattr('personel_id', 'equalto', personel.id)|list %}
+                    {% set personel_toplam = personel_avanslar|sum(attribute='miktar') %}
+                    <tr>
+                        <td>{{ personel.ad }}</td>
+                        <td>{{ personel.pozisyon }}</td>
+                        <td>{{ "{:,.0f}".format(personel.gunluk_maas) }} TL</td>
+                        <td class="money">{{ "{:,.2f}".format(personel_toplam) }} TL</td>
+                        <td>{{ personel_avanslar|length }} kez</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Hızlı Linkler -->
+        <div class="section">
+            <h2>Hızlı Erişim</h2>
+            <a href="{{ url_for('personel_rapor') }}" class="btn btn-primary">Maaş Raporu (Avans Dahil)</a>
+            <a href="{{ url_for('is_takip') }}" class="btn btn-primary">İş Takip</a>
+        </div>
+    </div>
+</body>
+</html>

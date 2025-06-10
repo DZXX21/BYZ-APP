@@ -1,0 +1,5 @@
+Flask==2.3.3
+Flask-MySQLdb==1.0.1
+MySQLdb==1.4.6
+reportlab==4.0.4
+Pillow==10.0.1
