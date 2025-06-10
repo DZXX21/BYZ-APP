@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash
+from flask import Flask, render_template, request, redirect, url_for, send_file
 from flask_mysqldb import MySQL
 from decimal import Decimal
 from io import BytesIO
@@ -8,131 +8,39 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.units import mm
 import os
-from functools import wraps
 
 app = Flask(__name__)
-
-# Gizli anahtar (session için)
-app.secret_key = 'byz-insaat-2025-secret-key-change-this'
 
 # MySQL Config
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'my-secret-pw'
+app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'teklif_sistemi'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
+# Türkçe karakter desteği için fontu yükle
+FONT_PATH = "fonts/DejaVuSans.ttf"
+LOGO_PATH = "static/img/logo.png"
+
+# Font yükleme kontrolü
+try:
+    if os.path.exists(FONT_PATH):
+        pdfmetrics.registerFont(TTFont("DejaVuSans", FONT_PATH))
+        FONT_AVAILABLE = True
+    else:
+        FONT_AVAILABLE = False
+        print("Uyarı: fonts/DejaVuSans.ttf bulunamadı! Helvetica kullanılacak.")
+except Exception as e:
+    FONT_AVAILABLE = False
+    print(f"Font yükleme hatası: {e}")
+
 mysql = MySQL(app)
 
-# Login gerekli decorator
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'kullanici_id' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Admin gerekli decorator
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'kullanici_id' not in session or session.get('rol') != 'admin':
-            flash('Bu sayfaya erişim yetkiniz yok!', 'error')
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# ==================== LOGIN SİSTEMİ ====================
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        kullanici_adi = request.form['kullanici_adi']
-        sifre = request.form['sifre']
-        
-        cur = mysql.connection.cursor()
-        cur.execute("""
-            SELECT id, kullanici_adi, ad_soyad, rol 
-            FROM kullanicilar 
-            WHERE kullanici_adi = %s AND sifre = %s AND aktif = TRUE
-        """, (kullanici_adi, sifre))
-        
-        kullanici = cur.fetchone()
-        cur.close()
-        
-        if kullanici:
-            session['kullanici_id'] = kullanici['id']
-            session['kullanici_adi'] = kullanici['kullanici_adi']
-            session['ad_soyad'] = kullanici['ad_soyad']
-            session['rol'] = kullanici['rol']
-            
-            flash(f'Hoş geldiniz, {kullanici["ad_soyad"]}!', 'success')
-            return redirect(url_for('index'))
-        else:
-            return render_template('login.html', error='Kullanıcı adı veya şifre hatalı!')
-    
-    # Zaten giriş yapmışsa ana sayfaya yönlendir
-    if 'kullanici_id' in session:
-        return redirect(url_for('index'))
-    
-    return render_template('login.html')
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('Çıkış yapıldı.', 'info')
-    return redirect(url_for('login'))
-
-# ==================== ANA SAYFA ====================
-
 @app.route('/')
-@login_required
 def index():
-    # Dashboard verileri
-    cur = mysql.connection.cursor()
-    
-    # İstatistikler
-    cur.execute("SELECT COUNT(*) as toplam FROM personel WHERE aktif = TRUE")
-    personel_sayisi = cur.fetchone()['toplam']
-    
-    cur.execute("SELECT COUNT(*) as toplam FROM musteri")
-    musteri_sayisi = cur.fetchone()['toplam']
-    
-    cur.execute("SELECT COUNT(*) as toplam FROM teklif")
-    teklif_sayisi = cur.fetchone()['toplam']
-    
-    # Bugün çalışan personel sayısı
-    from datetime import date
-    bugun = date.today()
-    cur.execute("""
-        SELECT COUNT(DISTINCT personel_id) as bugun_calisan 
-        FROM personel_takip 
-        WHERE DATE(tarih) = %s
-    """, [bugun])
-    bugun_calisan = cur.fetchone()['bugun_calisan']
-    
-    # Bu ayki toplam avans
-    cur.execute("""
-        SELECT COALESCE(SUM(miktar), 0) as bu_ay_avans
-        FROM nakit_avans 
-        WHERE MONTH(tarih) = %s AND YEAR(tarih) = %s
-    """, [bugun.month, bugun.year])
-    bu_ay_avans = cur.fetchone()['bu_ay_avans']
-    
-    cur.close()
-    
-    return render_template('index.html', 
-                         personel_sayisi=personel_sayisi,
-                         musteri_sayisi=musteri_sayisi,
-                         teklif_sayisi=teklif_sayisi,
-                         bugun_calisan=bugun_calisan,
-                         bu_ay_avans=bu_ay_avans)
-
-# ==================== PERSONEL ====================
+    return render_template('index.html')
 
 @app.route('/personel-ekle', methods=['GET', 'POST'])
-@login_required
 def personel_ekle():
     if request.method == 'POST':
         ad = request.form['ad']
@@ -149,15 +57,10 @@ def personel_ekle():
         """, (ad, pozisyon, telefon, eposta, adres, gunluk_maas))
         mysql.connection.commit()
         cur.close()
-        
-        flash('Personel başarıyla eklendi!', 'success')
         return redirect(url_for('index'))
     return render_template('personel_ekle.html')
 
-# ==================== ÜRÜN ====================
-
 @app.route('/urun-ekle', methods=['GET', 'POST'])
-@login_required
 def urun_ekle():
     if request.method == 'POST':
         ad = request.form['ad']
@@ -167,7 +70,7 @@ def urun_ekle():
         birim_fiyat = request.form['birim_fiyat']
         kdv_orani = float(request.form['kdv_orani'])
         
-        # KDV oranı kontrolü
+        # KDV oranı kontrolü - eğer 1'den büyükse yüzde olarak girilmiş, 100'e böl
         if kdv_orani > 1:
             kdv_orani = kdv_orani / 100
         
@@ -178,15 +81,10 @@ def urun_ekle():
         """, (ad, adet, renk, boyut_cm, birim_fiyat, kdv_orani))
         mysql.connection.commit()
         cur.close()
-        
-        flash('Ürün başarıyla eklendi!', 'success')
         return redirect(url_for('index'))
     return render_template('urun_ekle.html')
 
-# ==================== MÜŞTERİ ====================
-
 @app.route('/musteri-ekle', methods=['GET', 'POST'])
-@login_required
 def musteri_ekle():
     if request.method == 'POST':
         ad = request.form['ad']
@@ -203,15 +101,10 @@ def musteri_ekle():
         """, (ad, soyad, firma_adi, vergi_no, email, telefon))
         mysql.connection.commit()
         cur.close()
-        
-        flash('Müşteri başarıyla eklendi!', 'success')
         return redirect(url_for('index'))
     return render_template('musteri_ekle.html')
 
-# ==================== TEKLİF ====================
-
 @app.route('/teklif-olustur', methods=['GET', 'POST'])
-@login_required
 def teklif_olustur():
     cur = mysql.connection.cursor()
 
@@ -257,9 +150,7 @@ def teklif_olustur():
 
         mysql.connection.commit()
         cur.close()
-        
-        flash(f'Teklif başarıyla oluşturuldu! Toplam: {toplam:.2f} ₺', 'success')
-        return redirect(url_for('teklifler'))
+        return f"<h2>Teklif başarıyla oluşturuldu</h2><p>Toplam Tutar: {toplam:.2f} ₺</p><a href='/'>Ana Sayfa</a>"
 
     cur.execute("SELECT * FROM musteri")
     musteriler = cur.fetchall()
@@ -274,7 +165,6 @@ def teklif_olustur():
     return render_template('teklif_olustur.html', musteriler=musteriler, personeller=personeller, urunler=urunler)
 
 @app.route('/teklifler')
-@login_required
 def teklifler():
     cur = mysql.connection.cursor()
     cur.execute("""
@@ -287,16 +177,17 @@ def teklifler():
     cur.close()
     return render_template('teklif_liste.html', teklifler=teklifler)
 
-# ==================== İŞ TAKİP ====================
+# ==================== İŞ TAKİP SİSTEMİ ====================
 
 @app.route('/is-takip')
-@login_required
 def is_takip():
     cur = mysql.connection.cursor()
     
+    # Aktif personelleri getir
     cur.execute("SELECT * FROM personel WHERE aktif = TRUE ORDER BY ad")
     personeller = cur.fetchall()
     
+    # Bugünün kayıtlarını getir
     from datetime import date
     bugun = date.today()
     
@@ -313,18 +204,19 @@ def is_takip():
     return render_template('is_takip.html', personeller=personeller, bugun_kayitlari=bugun_kayitlari, bugun=bugun)
 
 @app.route('/personel-giris', methods=['POST'])
-@login_required
 def personel_giris():
     personel_id = request.form['personel_id']
-    tarih = request.form.get('tarih', '')
+    tarih = request.form.get('tarih', '')  # Özel tarih seçimi
     aciklama = request.form.get('aciklama', '')
     
     cur = mysql.connection.cursor()
     
+    # Eğer tarih belirtilmemişse bugünü kullan
     if not tarih:
         from datetime import datetime
         tarih = datetime.now().strftime('%Y-%m-%d')
     
+    # Bu personel bu tarihte zaten kayıt yapmış mı kontrol et
     cur.execute("""
         SELECT id FROM personel_takip 
         WHERE personel_id = %s AND DATE(tarih) = %s
@@ -332,30 +224,26 @@ def personel_giris():
     
     if cur.fetchone():
         cur.close()
-        flash('Bu personel bu tarihte zaten kayıt yapılmış!', 'error')
-        return redirect(url_for('is_takip'))
+        return f"Bu personel {tarih} tarihinde zaten kayıt yapılmış!", 400
     
+    # Giriş kaydı ekle (belirtilen tarih ile)
     cur.execute("""
         INSERT INTO personel_takip (personel_id, tarih, durum, aciklama)
         VALUES (%s, %s, 'giris', %s)
-    """, (personel_id, tarih + ' 08:00:00', aciklama))
+    """, (personel_id, tarih + ' 08:00:00', aciklama))  # Varsayılan saat 08:00
     
     mysql.connection.commit()
     cur.close()
-    
-    flash('Personel girişi kaydedildi!', 'success')
     return redirect(url_for('is_takip'))
 
 @app.route('/toplu-giris', methods=['POST'])
-@login_required
 def toplu_giris():
     personel_ids = request.form.getlist('personel_ids')
     tarih = request.form['tarih']
     aciklama = request.form.get('aciklama', 'Toplu kayıt')
     
     if not personel_ids:
-        flash('Hiç personel seçilmedi!', 'error')
-        return redirect(url_for('is_takip'))
+        return "Hiç personel seçilmedi!", 400
     
     cur = mysql.connection.cursor()
     
@@ -363,17 +251,20 @@ def toplu_giris():
     hatali = []
     
     for personel_id in personel_ids:
+        # Bu personel bu tarihte zaten kayıt yapmış mı kontrol et
         cur.execute("""
             SELECT id FROM personel_takip 
             WHERE personel_id = %s AND DATE(tarih) = %s
         """, [personel_id, tarih])
         
         if cur.fetchone():
+            # Personel adını al
             cur.execute("SELECT ad FROM personel WHERE id = %s", [personel_id])
             personel_ad = cur.fetchone()['ad']
             hatali.append(personel_ad)
             continue
         
+        # Giriş kaydı ekle
         cur.execute("""
             INSERT INTO personel_takip (personel_id, tarih, durum, aciklama)
             VALUES (%s, %s, 'giris', %s)
@@ -383,34 +274,31 @@ def toplu_giris():
     mysql.connection.commit()
     cur.close()
     
-    mesaj = f'{basarili} personel başarıyla kaydedildi.'
+    mesaj = f"{basarili} personel başarıyla kaydedildi."
     if hatali:
-        mesaj += f' Zaten kayıtlı olanlar: {", ".join(hatali)}'
+        mesaj += f" Zaten kayıtlı olanlar: {', '.join(hatali)}"
     
-    flash(mesaj, 'success' if basarili > 0 else 'warning')
-    return redirect(url_for('is_takip'))
+    return f"<h3>{mesaj}</h3><a href='{url_for('is_takip')}'>Geri Dön</a>"
 
 @app.route('/kayit-sil/<int:kayit_id>')
-@login_required
 def kayit_sil(kayit_id):
     cur = mysql.connection.cursor()
     cur.execute("DELETE FROM personel_takip WHERE id = %s", [kayit_id])
     mysql.connection.commit()
     cur.close()
-    
-    flash('Kayıt silindi!', 'info')
     return redirect(url_for('is_takip'))
 
-# ==================== NAKİT AVANS ====================
+# ==================== NAKİT AVANS SİSTEMİ ====================
 
 @app.route('/nakit-avans')
-@login_required
 def nakit_avans():
     cur = mysql.connection.cursor()
     
+    # Aktif personelleri getir
     cur.execute("SELECT * FROM personel WHERE aktif = TRUE ORDER BY ad")
     personeller = cur.fetchall()
     
+    # Bu ayki avans kayıtlarını getir
     from datetime import date
     bugun = date.today()
     
@@ -427,7 +315,6 @@ def nakit_avans():
     return render_template('nakit_avans.html', personeller=personeller, bu_ay_avanslar=bu_ay_avanslar)
 
 @app.route('/avans-ver', methods=['POST'])
-@login_required
 def avans_ver():
     personel_id = request.form['personel_id']
     miktar = float(request.form['miktar'])
@@ -435,15 +322,16 @@ def avans_ver():
     tarih = request.form.get('tarih', '')
     
     if miktar <= 0:
-        flash('Avans miktarı 0\'dan büyük olmalıdır!', 'error')
-        return redirect(url_for('nakit_avans'))
+        return "Avans miktarı 0'dan büyük olmalıdır!", 400
     
     cur = mysql.connection.cursor()
     
+    # Eğer tarih belirtilmemişse bugünü kullan
     if not tarih:
         from datetime import datetime
         tarih = datetime.now().strftime('%Y-%m-%d')
     
+    # Avans kaydı ekle
     cur.execute("""
         INSERT INTO nakit_avans (personel_id, miktar, tarih, aciklama)
         VALUES (%s, %s, %s, %s)
@@ -451,45 +339,42 @@ def avans_ver():
     
     mysql.connection.commit()
     cur.close()
-    
-    flash('Avans kaydı eklendi!', 'success')
     return redirect(url_for('nakit_avans'))
 
 @app.route('/avans-sil/<int:avans_id>')
-@login_required
 def avans_sil(avans_id):
     cur = mysql.connection.cursor()
     cur.execute("DELETE FROM nakit_avans WHERE id = %s", [avans_id])
     mysql.connection.commit()
     cur.close()
-    
-    flash('Avans kaydı silindi!', 'info')
     return redirect(url_for('nakit_avans'))
 
-# ==================== PERSONEL RAPORU ====================
-
 @app.route('/personel-rapor')
-@login_required
 def personel_rapor():
     cur = mysql.connection.cursor()
     
+    # Ay/yıl parametresi al (varsayılan: bu ay)
     from datetime import date
     ay = request.args.get('ay', date.today().month)
     yil = request.args.get('yil', date.today().year)
-    personel_id = request.args.get('personel_id', '')
+    personel_id = request.args.get('personel_id', '')  # Personel filtresi
     
+    # Tüm personel listesi (filtre için)
     cur.execute("SELECT * FROM personel WHERE aktif = TRUE ORDER BY ad")
     tum_personeller = cur.fetchall()
     
+    # Personel listesi (filtre varsa sadece o personel)
     if personel_id:
         cur.execute("SELECT * FROM personel WHERE id = %s AND aktif = TRUE", [personel_id])
         personeller = cur.fetchall()
     else:
         personeller = tum_personeller
     
+    # Her personel için çalışma günlerini ve avansları hesapla
     personel_raporu = []
     
     for p in personeller:
+        # Bu personelin bu aydaki giriş kayıtlarını say
         cur.execute("""
             SELECT COUNT(DISTINCT DATE(tarih)) as calisma_gunu
             FROM personel_takip 
@@ -502,6 +387,7 @@ def personel_rapor():
         result = cur.fetchone()
         calisma_gunu = result['calisma_gunu'] if result else 0
         
+        # Bu ayki toplam avansı hesapla
         cur.execute("""
             SELECT COALESCE(SUM(miktar), 0) as toplam_avans
             FROM nakit_avans 
@@ -513,6 +399,7 @@ def personel_rapor():
         avans_result = cur.fetchone()
         toplam_avans = float(avans_result['toplam_avans']) if avans_result else 0
         
+        # Maaş hesapla
         gunluk_maas = float(p['gunluk_maas'])
         brut_maas = calisma_gunu * gunluk_maas
         net_maas = brut_maas - toplam_avans
@@ -528,6 +415,7 @@ def personel_rapor():
     
     cur.close()
     
+    # Ay isimlerini Türkçe yap
     ay_isimleri = {
         1: 'Ocak', 2: 'Şubat', 3: 'Mart', 4: 'Nisan', 5: 'Mayıs', 6: 'Haziran',
         7: 'Temmuz', 8: 'Ağustos', 9: 'Eylül', 10: 'Ekim', 11: 'Kasım', 12: 'Aralık'
@@ -535,27 +423,28 @@ def personel_rapor():
     
     return render_template('personel_rapor.html', 
                          personel_raporu=personel_raporu,
-                         tum_personeller=tum_personeller,
+                         tum_personeller=tum_personeller,  # Filtre için gerekli
                          ay=int(ay), 
                          yil=int(yil),
                          ay_adi=ay_isimleri[int(ay)])
 
 @app.route('/personel-detay/<int:personel_id>')
-@login_required
 def personel_detay(personel_id):
     cur = mysql.connection.cursor()
     
+    # Personel bilgisi
     cur.execute("SELECT * FROM personel WHERE id = %s", [personel_id])
     personel = cur.fetchone()
     
     if not personel:
-        flash('Personel bulunamadı!', 'error')
-        return redirect(url_for('personel_rapor'))
+        return "Personel bulunamadı!", 404
     
+    # Ay/yıl parametresi
     from datetime import date
     ay = request.args.get('ay', date.today().month)
     yil = request.args.get('yil', date.today().year)
     
+    # Bu personelin detaylı iş kayıtları
     cur.execute("""
         SELECT DATE(tarih) as tarih_gun, 
                MIN(TIME(tarih)) as giris_saati,
@@ -570,6 +459,7 @@ def personel_detay(personel_id):
     
     is_kayitlari = cur.fetchall()
     
+    # Bu personelin bu ayki avans kayıtları
     cur.execute("""
         SELECT DATE(tarih) as tarih_gun, miktar, aciklama
         FROM nakit_avans 
@@ -581,6 +471,7 @@ def personel_detay(personel_id):
     
     avans_kayitlari = cur.fetchall()
     
+    # Hesaplamalar
     calisma_gunu = len([k for k in is_kayitlari if k['giris_saati']])
     brut_maas = calisma_gunu * float(personel['gunluk_maas'])
     toplam_avans = sum([float(a['miktar']) for a in avans_kayitlari])
@@ -605,13 +496,11 @@ def personel_detay(personel_id):
                          yil=int(yil),
                          ay_adi=ay_isimleri[int(ay)])
 
-# ==================== PDF TEKLİF ====================
-
 @app.route('/teklif/<int:teklif_id>/pdf')
-@login_required
 def teklif_pdf(teklif_id):
     cur = mysql.connection.cursor()
     
+    # Teklif ve müşteri bilgisi
     cur.execute("""
         SELECT t.*, m.ad, m.soyad, m.firma_adi, m.vergi_no
         FROM teklif t
@@ -621,9 +510,9 @@ def teklif_pdf(teklif_id):
     teklif = cur.fetchone()
     
     if not teklif:
-        flash('Teklif bulunamadı!', 'error')
-        return redirect(url_for('teklifler'))
+        return "Teklif bulunamadi!", 404
     
+    # Personeller
     cur.execute("""
         SELECT p.ad, p.pozisyon, p.gunluk_maas
         FROM teklif_personel tp
@@ -632,6 +521,7 @@ def teklif_pdf(teklif_id):
     """, [teklif_id])
     personeller = cur.fetchall()
     
+    # Ürünler
     cur.execute("""
         SELECT u.ad, tu.miktar, u.birim_fiyat, u.kdv_orani
         FROM teklif_urun tu
@@ -647,6 +537,7 @@ def teklif_pdf(teklif_id):
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
+    # Türkçe karakterleri temizleyen fonksiyon
     def temizle_turkce(metin):
         if metin is None:
             return ""
@@ -659,12 +550,23 @@ def teklif_pdf(teklif_id):
             metin = metin.replace(tr, en)
         return metin
     
+    # Font ayarı - sadece Helvetica kullan
     pdf.setFont("Helvetica", 10)
     
+    # Başlık bölümü - Logo ve firma bilgileri
     y = height - 40
     
+    # Üst bilgi kutusu
     pdf.rect(30, y - 80, width - 60, 80, fill=0)
     
+    # Logo (sol üst)
+    if os.path.exists(LOGO_PATH):
+        try:
+            pdf.drawImage(LOGO_PATH, 40, y - 70, width=80, height=60, preserveAspectRatio=True)
+        except:
+            pass
+    
+    # Firma bilgileri (orta üst)
     pdf.setFont("Helvetica-Bold", 18)
     pdf.drawString(140, y - 25, "BYZDIZAYN INSAAT")
     
@@ -673,9 +575,10 @@ def teklif_pdf(teklif_id):
     pdf.drawString(140, y - 55, "Tel: 0544 681 19 91")
     pdf.drawString(140, y - 68, "Email: info@byzdizayn.com")
     
+    # Teklif ID ve tarih (sag ust - kutu içinde)
     pdf.setFillGray(0.9)
     pdf.rect(width - 140, y - 70, 120, 60, fill=1)
-    pdf.setFillGray(0)
+    pdf.setFillGray(0)  # Siyaha geri döndür
     
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(width - 130, y - 20, "TEKLIF NO")
@@ -686,14 +589,17 @@ def teklif_pdf(teklif_id):
     pdf.drawString(width - 130, y - 50, f"Tarih:")
     pdf.drawString(width - 130, y - 62, f"{teklif['tarih']}")
     
+    # Ana çizgi
     pdf.line(30, y - 90, width - 30, y - 90)
     
+    # Müşteri bilgileri kutusu
     y -= 130
     pdf.rect(30, y - 80, width - 60, 80, fill=0)
     
+    # Başlık bölümü
     pdf.setFillGray(0.8)
     pdf.rect(30, y - 20, width - 60, 20, fill=1)
-    pdf.setFillGray(0)
+    pdf.setFillGray(0)  # Siyaha geri döndür
     
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(40, y - 15, "MUSTERI BILGILERI")
@@ -703,15 +609,17 @@ def teklif_pdf(teklif_id):
     pdf.drawString(40, y - 50, f"Firma: {temizle_turkce(teklif['firma_adi'])}")
     pdf.drawString(40, y - 65, f"Vergi No: {teklif['vergi_no']}")
     
+    # Personel toplam maliyeti
     y -= 110
     if personeller:
         pdf.setFont("Helvetica-Bold", 12)
         pdf.drawString(40, y, "PERSONEL MALIYETI")
         y -= 20
         
+        # Personel toplam hesaplama
         personel_toplam = 0
         for p in personeller:
-            gun_sayisi = int(teklif.get('gun_sayisi', 1))
+            gun_sayisi = int(teklif.get('gun_sayisi', 1))  # Teklif tablosundan gün sayısı
             gunluk_maas = float(p['gunluk_maas'])
             personel_toplam += gunluk_maas * gun_sayisi
         
@@ -719,12 +627,14 @@ def teklif_pdf(teklif_id):
         pdf.drawString(50, y, f"Toplam Personel Maliyeti: {personel_toplam:,.2f} TL")
         y -= 20
     
+    # Ürün listesi
     y -= 20
     if urunler:
         pdf.setFont("Helvetica-Bold", 12)
         pdf.drawString(40, y, "URUN LISTESI")
         y -= 20
         
+        # Tablo başlığı
         pdf.setFont("Helvetica-Bold", 10)
         pdf.drawString(50, y, "Urun Adi")
         pdf.drawString(200, y, "Miktar")
@@ -751,22 +661,25 @@ def teklif_pdf(teklif_id):
             pdf.drawString(450, y, f"{satirToplam:,.2f} TL")
             y -= 15
     
+    # Toplam fiyat kutusu - daha belirgin
     y -= 40
     toplam_fiyat = float(teklif['toplam_fiyat'])
     
+    # Büyük toplam kutusu
     pdf.setFillGray(0.9)
     pdf.rect(width - 280, y - 60, 250, 60, fill=1)
-    pdf.setFillGray(0)
+    pdf.setFillGray(0)  # Siyaha geri döndür
     
     pdf.setFont("Helvetica-Bold", 14)
     pdf.drawString(width - 270, y - 20, "GENEL TOPLAM")
     pdf.setFont("Helvetica-Bold", 20)
     pdf.drawString(width - 270, y - 45, f"{toplam_fiyat:,.2f} TL")
     
+    # Alt bilgi - daha profesyonel
     y -= 100
     pdf.setFillGray(0.95)
     pdf.rect(30, y - 40, width - 60, 40, fill=1)
-    pdf.setFillGray(0)
+    pdf.setFillGray(0)  # Siyaha geri döndür
     
     pdf.setFont("Helvetica-Bold", 10)
     pdf.drawString(40, y - 15, "NOTLAR VE KOSULLAR")
@@ -774,10 +687,12 @@ def teklif_pdf(teklif_id):
     pdf.drawString(40, y - 28, "• Bu teklif 30 gun gecerlidir.")
     pdf.drawString(40, y - 38, "• Isbirligi icin tesekkur ederiz. - BYZDIZAYN INSAAT")
     
+    # PDF'i kaydet
     pdf.save()
     buffer.seek(0)
     
     return send_file(buffer, as_attachment=True, download_name=f"teklif_{teklif_id}.pdf", mimetype='application/pdf')
 
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=4040)
+    app.run(debug=True)
